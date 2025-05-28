@@ -1,45 +1,44 @@
-import pymunk
+import numpy as np
 
 
 class GravityMode:
-    def __init__(self, ball, game_map):
-        self.ball = ball
-        self.map = game_map
-        self.space = pymunk.Space()
-        self.space.gravity = (0, -900)  # 设置重力
+    def __init__(self):
+        self.name = "Gravity Mode"
+        self.gravity = np.array([0, -0.5])  # 默认向下重力
+        self.rotation_speed = 90  # 旋转速度(度/秒)
+        self.current_angle = 0  # 当前旋转角度
 
-        # 创建物理小球
-        mass = 1
-        radius = 15
-        inertia = pymunk.moment_for_circle(mass, 0, radius, (0, 0))
-        body = pymunk.Body(mass, inertia)
-        body.position = pymunk.Vec2d(ball.position[0], ball.position[1])
-        shape = pymunk.Circle(body, radius, (0, 0))
-        shape.elasticity = 0.8
-        shape.friction = 0.5
-        self.space.add(body, shape)
+    def rotate_map(self, game_map, direction):
+        """旋转地图并调整重力方向"""
+        if direction is None:
+            return
 
-        self.ball.physical_body = body
+        # 根据输入方向计算角度变化
+        if direction == 'left':
+            self.current_angle += self.rotation_speed
+        elif direction == 'right':
+            self.current_angle -= self.rotation_speed
 
-        # 创建地图的物理边界
-        self._create_map_boundaries()
+        # 标准化角度到0-360范围
+        self.current_angle %= 360
 
-    def _create_map_boundaries(self):
-        # 根据地图创建物理边界
-        for wall in self.map.walls:
-            # 为每个墙壁创建物理形状...
-            pass
+        # 根据角度计算重力方向
+        radians = np.radians(self.current_angle)
+        self.gravity = np.array([
+            np.sin(radians),  # x分量
+            -np.cos(radians)  # y分量 (负号因为屏幕y轴向下)
+        ]) * 0.5  # 重力大小保持0.5
 
-    def rotate_map(self, direction):
-        # 旋转地图逻辑
-        if direction == "up":
-            # 逆时针旋转
-            pass
-        elif direction == "down":
-            # 顺时针旋转
-            pass
+    def apply_gravity_to_ball(self, ball):
+        """对小球应用重力并更新位置"""
+        ball.velocity += self.gravity
+        ball.update_position()
 
-    def update(self):
-        self.space.step(1 / 60)  # 更新物理模拟
-        self.ball.position = [self.ball.physical_body.position.x,
-                              self.ball.physical_body.position.y]
+        # 可选：添加速度限制
+        max_speed = 10
+        speed = np.linalg.norm(ball.velocity)
+        if speed > max_speed:
+            ball.velocity = ball.velocity / speed * max_speed
+
+    def control_ball(self, ball, direction):
+        pass

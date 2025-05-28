@@ -1,18 +1,16 @@
-
 class Tool:
-    def __init__(self):
-        self.tools = {
-            "trap_remover": 0,
-            "thorn_remover": 0,
-            "enemy_freezer": 0
-        }
+    def __init__(self, tool_type='obstacle_remover', count=0):
+        self.type = tool_type
+        self.count = count
 
-    def use_tool(self, tool_type):
-        if self.tools.get(tool_type, 0) > 0:
-            self.tools[tool_type] -= 1
+    def use_tool(self):
+        """使用工具"""
+        if self.count > 0:
+            self.count -= 1
             return True
         return False
 
-    def increase_count(self, tool_type, amount=1):
-        if tool_type in self.tools:
-            self.tools[tool_type] += amount
+    def increase_count(self, amount=1):
+        """增加工具数量"""
+        self.count += amount
+        return self.count

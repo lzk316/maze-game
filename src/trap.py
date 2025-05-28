@@ -1,20 +1,18 @@
-from src.obstacle import Obstacle
 import pygame
-
+from src.obstacle import Obstacle
 
 class Trap(Obstacle):
-    def __init__(self, position, radius):
-        super().__init__(position)
-        self.radius = radius
-        self.color = (255, 255, 0)  # 黄色陷阱
+    def __init__(self, position, radius=15):
+        super().__init__(position, radius)
+        self.color = (255, 0, 0)  # 红色
 
-    def check_collision(self, ball):
-        # 简单距离检测
-        distance = ((ball.position[0] - self.position[0]) ** 2 +
-                    (ball.position[1] - self.position[1]) ** 2) ** 0.5
-        return distance < (ball.radius + self.radius)
+    def activate(self):
+        """激活陷阱"""
+        super().activate()
+        return True  # 返回True表示需要重置关卡
 
     def draw(self, screen):
+        """绘制陷阱"""
         pygame.draw.circle(screen, self.color,
                            (int(self.position[0]), int(self.position[1])),
                            self.radius)
