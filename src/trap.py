@@ -1,5 +1,5 @@
 import pygame
-from src.obstacle import Obstacle
+from obstacle import Obstacle
 
 class Trap(Obstacle):
     def __init__(self, position, radius=15):

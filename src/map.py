@@ -14,21 +14,30 @@ class Map:
 
         try:
             self.image = pygame.image.load(str(full_path))
-            self.image_array = pygame.surfarray.array3d(self.image).swapaxes(0,1)
+            self.image_array = pygame.surfarray.array3d(self.image).swapaxes(0, 1)
         except FileNotFoundError:
             raise FileNotFoundError(f"地图图片未找到: {full_path}")
         except pygame.error:
             raise ValueError(f"无法加载图片: {full_path}")
+
         self.scale = scale
-        self.width = self.image.get_width() * scale
-        self.height = self.image.get_height() * scale
+        self.raw_width = self.image.get_width()  # 原始图片宽度(像素)
+        self.raw_height = self.image.get_height()  # 原始图片高度(像素)
+        self.game_width = self.raw_width * scale  # 游戏逻辑宽度
+        self.game_height = self.raw_height * scale  # 游戏逻辑高度
+
+        # 游戏元素
         self.walls = []
         self.traps = []
         self.start_position = None
         self.end_position = None
         self.obstacle_radius = 15
-        self.offset_x = 0  # 水平偏移量
-        self.offset_y = 0  # 垂直偏移量
+
+        # UI显示相关
+        self.screen_width = 0
+        self.screen_height = 0
+        self.offset_x = 0
+        self.offset_y = 0
 
         self.parse_map()
 
@@ -60,21 +69,31 @@ class Map:
 
     def get_start_position(self):
         """获取起始位置"""
-        if self.start_position:
-            return (self.start_position[0] + self.offset_x,
-                    self.start_position[1] + self.offset_y)
-        return None
+        return self.start_position  # 已经是游戏坐标，不需要加offset
 
     def check_collision(self, ball):
-        """检查碰撞：墙壁矩形碰撞，陷阱圆形碰撞"""
-        # 调整球的位置以考虑地图偏移
-        adjusted_ball_pos = (ball.position[0] - self.offset_x,
-                             ball.position[1] - self.offset_y)
+        """检查碰撞并返回碰撞类型"""
+        ball_pos = np.array([ball.position[0], ball.position[1]])
 
-        # 墙壁碰撞（矩形）
+        # 1. 检查终点
+        if self.end_position:
+            end_pos = np.array(self.end_position)
+            distance = np.linalg.norm(ball_pos - end_pos)
+            if distance < (ball.radius + self.end_radius):
+                return "goal"
+
+        # 2. 检查陷阱
+        for trap in self.traps:
+            trap_pos = np.array(trap.position)
+            distance = np.linalg.norm(ball_pos - trap_pos)
+            if distance < (ball.radius + trap.radius):
+                trap.activate()
+                return "trap"
+
+        # 3. 检查墙壁
         ball_rect = pygame.Rect(
-            adjusted_ball_pos[0] - ball.radius,
-            adjusted_ball_pos[1] - ball.radius,
+            ball.position[0] - ball.radius,
+            ball.position[1] - ball.radius,
             ball.radius * 2,
             ball.radius * 2
         )
@@ -82,66 +101,59 @@ class Map:
         for wall in self.walls:
             wall_rect = pygame.Rect(wall)
             if wall_rect.colliderect(ball_rect):
-                return True
+                # 计算从哪边碰撞
+                if abs(ball_rect.left - wall_rect.right) < 5:
+                    return "wall_right"
+                elif abs(ball_rect.right - wall_rect.left) < 5:
+                    return "wall_left"
+                elif abs(ball_rect.top - wall_rect.bottom) < 5:
+                    return "wall_bottom"
+                elif abs(ball_rect.bottom - wall_rect.top) < 5:
+                    return "wall_top"
+                return "wall"
 
-        # 陷阱碰撞（圆形）
-        for trap in self.traps:
-            if trap.check_collision(ball):
-                trap.activate()
-                return True
+        # 4. 检查地图边界
+        if (ball.position[0] < ball.radius or
+                ball.position[0] > self.game_width - ball.radius or
+                ball.position[1] < ball.radius or
+                ball.position[1] > self.game_height - ball.radius):
+            return "boundary"
 
-        return False
-
-    def check_win_condition(self, ball):
-        """检查是否到达终点（圆形碰撞）"""
-        if not self.end_position:
-            return False
-
-        # 调整球的位置以考虑地图偏移
-        adjusted_ball_pos = np.array([ball.position[0] - self.offset_x,
-                                      ball.position[1] - self.offset_y])
-        adjusted_end_pos = np.array([self.end_position[0],
-                                     self.end_position[1]])
-
-        distance = np.linalg.norm(adjusted_ball_pos - adjusted_end_pos)
-        return distance < (ball.radius + self.end_radius)
+        return None
 
     def calculate_offset(self, screen_width, screen_height):
         """计算地图居中所需的偏移量"""
-        self.offset_x = (screen_width - self.width) // 2
-        self.offset_y = (screen_height - self.height) // 2
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.offset_x = (screen_width - self.game_width) // 2
+        self.offset_y = (screen_height - self.game_height) // 2
 
     def draw(self, screen):
         """绘制地图"""
-        screen_width, screen_height = screen.get_size()
-        self.calculate_offset(screen_width, screen_height)
+        self.calculate_offset(screen.get_width(), screen.get_height())
+
+        # 绘制背景（可选）
+        screen.fill((240, 240, 240))  # 浅灰色背景
+
 
         # 绘制墙壁
         for wall in self.walls:
-            adjusted_wall = (
+            pygame.draw.rect(screen, (0, 0, 0), (
                 wall[0] + self.offset_x,
                 wall[1] + self.offset_y,
-                wall[2],
-                wall[3]
-            )
-            pygame.draw.rect(screen, (0, 0, 0), adjusted_wall)
+                wall[2], wall[3]
+            ))
 
         # 绘制陷阱
         for trap in self.traps:
-            adjusted_pos = (
-                trap.position[0] + self.offset_x,
-                trap.position[1] + self.offset_y
-            )
             pygame.draw.circle(screen, trap.color,
-                               (int(adjusted_pos[0]), int(adjusted_pos[1])),
+                               (int(trap.position[0] + self.offset_x),
+                                int(trap.position[1] + self.offset_y)),
                                trap.radius)
 
         # 绘制终点
         if self.end_position:
-            adjusted_end_pos = (
-                self.end_position[0] + self.offset_x,
-                self.end_position[1] + self.offset_y
-            )
             pygame.draw.circle(screen, (0, 0, 255),
-                               (int(adjusted_end_pos[0]), int(adjusted_end_pos[1])),
+                               (int(self.end_position[0] + self.offset_x),
+                                int(self.end_position[1] + self.offset_y)),
                                self.end_radius)
