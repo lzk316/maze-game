@@ -9,7 +9,7 @@ from gravity_mode import GravityMode
 
 
 class Level:
-    def __init__(self, level_number, difficulty='easy', mode='non-gravity'):
+    def __init__(self, level_number, difficulty, mode):
         self.victory_time = None
         self.show_victory = None
         self.level_number = level_number
@@ -47,6 +47,14 @@ class Level:
 
         self.ball = Ball(start_pos)
 
+        if self.mode == 'gravity':
+            # 改为使用地图中心作为旋转中心
+            map_center = (
+                self.game_map.game_width // 2,
+                self.game_map.game_height // 2
+            )
+            self.mode_handler.set_rotation_center(map_center)
+
         # 根据难度初始化工具
         if self.difficulty == 'easy':
             self.tool.increase_count(3)  # 简单模式给3个工具
@@ -67,17 +75,17 @@ class Level:
             # 保存上一帧位置用于碰撞回退
             prev_pos = np.copy(self.ball.position)
 
-            # 更新球的位置
+            # 根据模式调用不同的控制方法
             if self.mode == 'non-gravity':
                 direction = self.controller.get_direction()
                 self.mode_handler.control_ball(self.ball, direction)
             else:
                 rotation = self.controller.get_rotation()
-                self.mode_handler.rotate_map(self.game_map, rotation)
+                self.mode_handler.rotate_map(rotation)
                 self.mode_handler.apply_gravity_to_ball(self.ball)
 
             # 检测碰撞
-            collision = self.game_map.check_collision(self.ball)
+            collision = self.game_map.check_collision(self.ball, self.mode_handler)
 
             if collision == "trap":
                 # 陷阱碰撞 - 重置到起点
@@ -85,12 +93,8 @@ class Level:
                     print("重置失败：找不到起始位置！")
 
             elif collision and ("wall" in collision or collision == "boundary"):
-                # 墙壁或边界碰撞 - 根据方向反弹
-                if "left" in collision or "right" in collision:
-                    self.ball.velocity[0] *= -0.7  # x方向反弹
-                if "top" in collision or "bottom" in collision:
-                    self.ball.velocity[1] *= -0.7  # y方向反弹
-
+                # 墙壁或边界碰撞 - 物理反弹
+                self.mode_handler.handle_collision(self.ball, collision)
                 # 回退到碰撞前位置
                 self.ball.position = prev_pos
 
@@ -106,7 +110,10 @@ class Level:
             return
 
         # 绘制地图
-        self.game_map.draw(screen)
+        if self.mode == 'gravity':
+            self.game_map.draw(screen, self.mode_handler)
+        else:
+            self.game_map.draw(screen)
 
         # 绘制小球
         if self.ball:

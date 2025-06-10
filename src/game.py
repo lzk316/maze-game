@@ -4,7 +4,7 @@ from player import Player
 
 
 class Game:
-    def __init__(self, screen_width=1600, screen_height=900):
+    def __init__(self, screen_width=1600, screen_height=1000):
         pygame.init()
         self.screen = pygame.display.set_mode((screen_width, screen_height))
         self.clock = pygame.time.Clock()
@@ -12,10 +12,15 @@ class Game:
         self.current_level = None
         self.game_mode = None  # 'gravity' or 'non-gravity'
 
-    def start_level(self, level_number, difficulty='easy', mode='non-gravity'):
+    def start_level(self, level_number, difficulty, mode):
         """开始指定关卡"""
         self.current_level = Level(level_number, difficulty, mode)
         self.game_mode = mode
+
+        # 初始化旋转中心
+        if mode == 'gravity' and self.current_level.mode_handler:
+            center = (self.screen.get_width() // 2, self.screen.get_height() // 2)
+            self.current_level.mode_handler.set_rotation_center(center)
 
         # 构建地图文件名
         map_file = f"maze{level_number}.png"

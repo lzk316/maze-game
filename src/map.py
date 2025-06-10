@@ -69,9 +69,35 @@ class Map:
 
     def get_start_position(self):
         """获取起始位置"""
-        return self.start_position  # 已经是游戏坐标，不需要加offset
+        return self.start_position
 
-    def check_collision(self, ball):
+    def get_transformed_walls(self, gravity_mode):
+        """返回旋转变换后的墙体位置（用于碰撞检测）"""
+        if not gravity_mode:
+            return self.walls
+
+        transformed_walls = []
+        for wall in self.walls:
+            x, y, w, h = wall
+            corners = [
+                (x, y),
+                (x + w, y),
+                (x + w, y + h),
+                (x, y + h)
+            ]
+            rotated = [gravity_mode.transform_point(corner) for corner in corners]
+
+            # 得到外接矩形
+            xs = [p[0] for p in rotated]
+            ys = [p[1] for p in rotated]
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+            width = max_x - min_x
+            height = max_y - min_y
+            transformed_walls.append((min_x, min_y, width, height))
+        return transformed_walls
+
+    def check_collision(self, ball, gravity_mode=None):
         """检查碰撞并返回碰撞类型"""
         ball_pos = np.array([ball.position[0], ball.position[1]])
 
@@ -98,7 +124,8 @@ class Map:
             ball.radius * 2
         )
 
-        for wall in self.walls:
+        walls = self.get_transformed_walls(gravity_mode)
+        for wall in walls:
             wall_rect = pygame.Rect(wall)
             if wall_rect.colliderect(ball_rect):
                 # 计算从哪边碰撞
@@ -128,32 +155,50 @@ class Map:
         self.offset_x = (screen_width - self.game_width) // 2
         self.offset_y = (screen_height - self.game_height) // 2
 
-    def draw(self, screen):
+    def draw(self, screen, gravity_mode=None):
         """绘制地图"""
         self.calculate_offset(screen.get_width(), screen.get_height())
 
         # 绘制背景（可选）
         screen.fill((240, 240, 240))  # 浅灰色背景
 
+        # 获取变换函数（如果有）
+        if gravity_mode:
+            # 传递地图中心坐标（不考虑屏幕偏移）
+            transform_func = lambda point: gravity_mode.transform_point(point)
+        else:
+            transform_func = lambda point: point
 
         # 绘制墙壁
         for wall in self.walls:
-            pygame.draw.rect(screen, (0, 0, 0), (
-                wall[0] + self.offset_x,
-                wall[1] + self.offset_y,
-                wall[2], wall[3]
-            ))
+            # 原始矩形坐标
+            x, y, w, h = wall
+            points = [
+                (x, y),
+                (x + w, y),
+                (x + w, y + h),
+                (x, y + h)
+            ]
+
+            # 应用旋转变换
+            transformed = [transform_func(p) for p in points]
+
+            # 应用屏幕偏移
+            screen_points = [(p[0] + self.offset_x, p[1] + self.offset_y) for p in transformed]
+
+            pygame.draw.polygon(screen, (0, 0, 0), screen_points)
 
         # 绘制陷阱
         for trap in self.traps:
+            pos = transform_func(trap.position)
             pygame.draw.circle(screen, trap.color,
-                               (int(trap.position[0] + self.offset_x),
-                                int(trap.position[1] + self.offset_y)),
+                               (int(pos[0] + self.offset_x), int(pos[1] + self.offset_y)),
                                trap.radius)
 
         # 绘制终点
         if self.end_position:
+            pos = transform_func(self.end_position)
             pygame.draw.circle(screen, (0, 0, 255),
-                               (int(self.end_position[0] + self.offset_x),
-                                int(self.end_position[1] + self.offset_y)),
+                               (int(pos[0] + self.offset_x), int(pos[1] + self.offset_y)),
                                self.end_radius)
+

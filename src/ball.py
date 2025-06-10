@@ -7,9 +7,9 @@ class Ball:
         self.position = np.array(position, dtype=float)
         self.velocity = np.array([0, 0], dtype=float)
         self.radius = 15  # 直径30像素
-        self.direction = np.array([0, 0], dtype=float)
+        self.mass = 1.0  # 质量(kg)
         self.color = (0, 255, 0)  # 绿色
-        self.speed = 5  # 移动速度
+        self.speed = 5  # 移动速度(非重力模式下使用)
 
     def apply_gravity(self, gravity=(0, -0.5)):
         """应用重力"""
