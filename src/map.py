@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 class Map:
-    def __init__(self, image_path, scale=10):
+    def __init__(self, image_path, scale=100):
         # 构建正确的图片路径
         base_dir = Path(__file__).parent.parent  # 获取上级目录
         full_path = base_dir / "assets" / "images" / image_path
@@ -23,15 +23,20 @@ class Map:
         self.scale = scale
         self.raw_width = self.image.get_width()  # 原始图片宽度(像素)
         self.raw_height = self.image.get_height()  # 原始图片高度(像素)
-        self.game_width = self.raw_width * scale  # 游戏逻辑宽度
-        self.game_height = self.raw_height * scale  # 游戏逻辑高度
+        self.game_width = self.raw_width * scale  # 游戏逻辑宽度（扩大100倍）
+        self.game_height = self.raw_height * scale  # 游戏逻辑高度（扩大100倍）
+
+        # 添加UI显示比例
+        self.ui_scale = 0.1  # UI显示缩小10倍
+        self.ui_width = int(self.game_width * self.ui_scale)
+        self.ui_height = int(self.game_height * self.ui_scale)
 
         # 游戏元素
         self.walls = []
         self.traps = []
         self.start_position = None
         self.end_position = None
-        self.obstacle_radius = 15
+        self.obstacle_radius = 150
 
         # UI显示相关
         self.screen_width = 0
@@ -95,56 +100,113 @@ class Map:
             width = max_x - min_x
             height = max_y - min_y
             transformed_walls.append((min_x, min_y, width, height))
+
         return transformed_walls
 
     def check_collision(self, ball, gravity_mode=None):
-        """检查碰撞并返回碰撞类型"""
-        ball_pos = np.array([ball.position[0], ball.position[1]])
+        if gravity_mode:
+            ball_pos = gravity_mode.transform_point(ball.position)
+        else:
+            ball_pos = ball.position
+
+        # 使用圆形碰撞检测而不是矩形
+        ball_circle = (ball_pos[0], ball_pos[1], ball.radius)
 
         # 1. 检查终点
         if self.end_position:
             end_pos = np.array(self.end_position)
+            if gravity_mode:
+                end_pos = gravity_mode.transform_point(end_pos)
+
             distance = np.linalg.norm(ball_pos - end_pos)
             if distance < (ball.radius + self.end_radius):
-                return "goal"
+                return {"type": "goal", "point": end_pos}
 
         # 2. 检查陷阱
         for trap in self.traps:
             trap_pos = np.array(trap.position)
+            if gravity_mode:
+                trap_pos = gravity_mode.transform_point(trap_pos)
+
             distance = np.linalg.norm(ball_pos - trap_pos)
             if distance < (ball.radius + trap.radius):
                 trap.activate()
-                return "trap"
+                return {"type": "trap", "point": trap_pos}
 
-        # 3. 检查墙壁
-        ball_rect = pygame.Rect(
-            ball.position[0] - ball.radius,
-            ball.position[1] - ball.radius,
-            ball.radius * 2,
-            ball.radius * 2
-        )
-
+        # 3. 精确的墙壁碰撞检测
         walls = self.get_transformed_walls(gravity_mode)
         for wall in walls:
             wall_rect = pygame.Rect(wall)
-            if wall_rect.colliderect(ball_rect):
-                # 计算从哪边碰撞
-                if abs(ball_rect.left - wall_rect.right) < 5:
-                    return "wall_right"
-                elif abs(ball_rect.right - wall_rect.left) < 5:
-                    return "wall_left"
-                elif abs(ball_rect.top - wall_rect.bottom) < 5:
-                    return "wall_bottom"
-                elif abs(ball_rect.bottom - wall_rect.top) < 5:
-                    return "wall_top"
-                return "wall"
+
+            # 计算球心到矩形的最短距离
+            closest_x = max(wall_rect.left, min(ball_pos[0], wall_rect.right))
+            closest_y = max(wall_rect.top, min(ball_pos[1], wall_rect.bottom))
+
+            distance_x = ball_pos[0] - closest_x
+            distance_y = ball_pos[1] - closest_y
+            distance = np.sqrt(distance_x ** 2 + distance_y ** 2)
+
+            if distance < ball.radius:
+                # 计算碰撞法向量
+                if distance == 0:  # 球心在矩形内
+                    # 找出最短的逃脱方向
+                    dist_left = abs(ball_pos[0] - wall_rect.left)
+                    dist_right = abs(ball_pos[0] - wall_rect.right)
+                    dist_top = abs(ball_pos[1] - wall_rect.top)
+                    dist_bottom = abs(ball_pos[1] - wall_rect.bottom)
+
+                    min_dist = min(dist_left, dist_right, dist_top, dist_bottom)
+
+                    if min_dist == dist_left:
+                        normal = np.array([-1, 0])
+                    elif min_dist == dist_right:
+                        normal = np.array([1, 0])
+                    elif min_dist == dist_top:
+                        normal = np.array([0, -1])
+                    else:
+                        normal = np.array([0, 1])
+                else:
+                    normal = np.array([distance_x, distance_y]) / distance
+
+                collision_point = np.array([closest_x, closest_y])
+
+                # 确定碰撞类型
+                if abs(ball_pos[0] - wall_rect.left) < ball.radius:
+                    return {"type": "wall_left", "point": collision_point, "normal": normal}
+                elif abs(ball_pos[0] - wall_rect.right) < ball.radius:
+                    return {"type": "wall_right", "point": collision_point, "normal": normal}
+                elif abs(ball_pos[1] - wall_rect.top) < ball.radius:
+                    return {"type": "wall_top", "point": collision_point, "normal": normal}
+                elif abs(ball_pos[1] - wall_rect.bottom) < ball.radius:
+                    return {"type": "wall_bottom", "point": collision_point, "normal": normal}
+                else:
+                    return {"type": "wall", "point": collision_point, "normal": normal}
 
         # 4. 检查地图边界
-        if (ball.position[0] < ball.radius or
-                ball.position[0] > self.game_width - ball.radius or
-                ball.position[1] < ball.radius or
-                ball.position[1] > self.game_height - ball.radius):
-            return "boundary"
+        boundary_collision = False
+        normal = np.array([0, 0])
+
+        if ball_pos[0] < ball.radius:
+            boundary_collision = True
+            normal += np.array([1, 0])
+        if ball_pos[0] > self.game_width - ball.radius:
+            boundary_collision = True
+            normal += np.array([-1, 0])
+        if ball_pos[1] < ball.radius:
+            boundary_collision = True
+            normal += np.array([0, 1])
+        if ball_pos[1] > self.game_height - ball.radius:
+            boundary_collision = True
+            normal += np.array([0, -1])
+
+        if boundary_collision:
+            if np.linalg.norm(normal) > 0:
+                normal = normal / np.linalg.norm(normal)
+            collision_point = np.array([
+                max(ball.radius, min(ball_pos[0], self.game_width - ball.radius)),
+                max(ball.radius, min(ball_pos[1], self.game_height - ball.radius))
+            ])
+            return {"type": "boundary", "point": collision_point, "normal": normal}
 
         return None
 
@@ -152,53 +214,77 @@ class Map:
         """计算地图居中所需的偏移量"""
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.offset_x = (screen_width - self.game_width) // 2
-        self.offset_y = (screen_height - self.game_height) // 2
+        self.offset_x = (screen_width - self.ui_width) // 2
+        self.offset_y = (screen_height - self.ui_height) // 2
 
     def draw(self, screen, gravity_mode=None):
-        """绘制地图"""
+        """绘制地图（基于逻辑坐标旋转，再缩放并偏移到UI）"""
         self.calculate_offset(screen.get_width(), screen.get_height())
 
         # 绘制背景（可选）
         screen.fill((240, 240, 240))  # 浅灰色背景
 
         # 获取变换函数（如果有）
-        if gravity_mode:
-            # 传递地图中心坐标（不考虑屏幕偏移）
-            transform_func = lambda point: gravity_mode.transform_point(point)
-        else:
-            transform_func = lambda point: point
+        transform_func = gravity_mode.transform_point if gravity_mode else lambda p: p
 
         # 绘制墙壁
         for wall in self.walls:
-            # 原始矩形坐标
             x, y, w, h = wall
-            points = [
+            # 定义墙体的四个角（逻辑坐标）
+            corners = [
                 (x, y),
                 (x + w, y),
                 (x + w, y + h),
                 (x, y + h)
             ]
-
-            # 应用旋转变换
-            transformed = [transform_func(p) for p in points]
-
-            # 应用屏幕偏移
-            screen_points = [(p[0] + self.offset_x, p[1] + self.offset_y) for p in transformed]
-
-            pygame.draw.polygon(screen, (0, 0, 0), screen_points)
+            # 旋转逻辑坐标（如果有重力模式）
+            rotated_corners = [transform_func(corner) for corner in corners]
+            # 缩小到UI坐标并加上偏移量
+            screen_corners = [
+                (
+                    int(corner[0] * self.ui_scale + self.offset_x),
+                    int(corner[1] * self.ui_scale + self.offset_y)
+                )
+                for corner in rotated_corners
+            ]
+            pygame.draw.polygon(screen, (0, 0, 0), screen_corners)
 
         # 绘制陷阱
         for trap in self.traps:
-            pos = transform_func(trap.position)
-            pygame.draw.circle(screen, trap.color,
-                               (int(pos[0] + self.offset_x), int(pos[1] + self.offset_y)),
-                               trap.radius)
+            # 获取陷阱的逻辑坐标
+            trap_pos = trap.position
+            # 旋转逻辑坐标（如果有重力模式）
+            if gravity_mode:
+                trap_pos = transform_func(trap_pos)
+            # 缩小到UI坐标并加上偏移量
+            screen_pos = (
+                int(trap_pos[0] * self.ui_scale + self.offset_x),
+                int(trap_pos[1] * self.ui_scale + self.offset_y)
+            )
+            # 绘制陷阱（半径也缩小10倍）
+            pygame.draw.circle(
+                screen,
+                trap.color,
+                screen_pos,
+                int(trap.radius * self.ui_scale)
+            )
 
         # 绘制终点
         if self.end_position:
-            pos = transform_func(self.end_position)
-            pygame.draw.circle(screen, (0, 0, 255),
-                               (int(pos[0] + self.offset_x), int(pos[1] + self.offset_y)),
-                               self.end_radius)
-
+            # 获取终点的逻辑坐标
+            end_pos = self.end_position
+            # 旋转逻辑坐标（如果有重力模式）
+            if gravity_mode:
+                end_pos = transform_func(end_pos)
+            # 缩小到UI坐标并加上偏移量
+            screen_pos = (
+                int(end_pos[0] * self.ui_scale + self.offset_x),
+                int(end_pos[1] * self.ui_scale + self.offset_y)
+            )
+            # 绘制终点（半径也缩小10倍）
+            pygame.draw.circle(
+                screen,
+                (0, 0, 255),  # 蓝色
+                screen_pos,
+                int(self.end_radius * self.ui_scale)
+            )

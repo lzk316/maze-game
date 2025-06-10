@@ -2,7 +2,7 @@ import pygame
 from obstacle import Obstacle
 
 class Trap(Obstacle):
-    def __init__(self, position, radius=15):
+    def __init__(self, position, radius=150):
         super().__init__(position, radius)
         self.color = (255, 0, 0)  # 红色
 

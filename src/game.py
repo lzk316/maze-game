@@ -70,4 +70,5 @@ class Game:
             pygame.display.flip()
             self.clock.tick(60)  # 60 FPS
 
+
         pygame.quit()

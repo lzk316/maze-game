@@ -3,7 +3,7 @@ import numpy as np
 
 
 class Obstacle:
-    def __init__(self, position, radius=15):
+    def __init__(self, position, radius=150):
         self.position = np.array(position)
         self.radius = radius
         self.is_active = True

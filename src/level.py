@@ -47,13 +47,13 @@ class Level:
 
         self.ball = Ball(start_pos)
 
-        if self.mode == 'gravity':
-            # 改为使用地图中心作为旋转中心
-            map_center = (
-                self.game_map.game_width // 2,
-                self.game_map.game_height // 2
+
+
+        map_center = (
+            self.game_map.game_width // 2,
+            self.game_map.game_height // 2
             )
-            self.mode_handler.set_rotation_center(map_center)
+        self.mode_handler.set_rotation_center(map_center)
 
         # 根据难度初始化工具
         if self.difficulty == 'easy':
@@ -72,37 +72,56 @@ class Level:
 
     def update(self):
         if not self.is_completed and self.ball and self.game_map:
-            # 保存上一帧位置用于碰撞回退
-            prev_pos = np.copy(self.ball.position)
+            # 增加子步数以提高精度
+            sub_steps = 8  # 增加到8个子步
 
-            # 根据模式调用不同的控制方法
-            if self.mode == 'non-gravity':
-                direction = self.controller.get_direction()
-                self.mode_handler.control_ball(self.ball, direction)
-            else:
-                rotation = self.controller.get_rotation()
-                self.mode_handler.rotate_map(rotation)
-                self.mode_handler.apply_gravity_to_ball(self.ball)
+            for _ in range(sub_steps):
+                prev_pos = np.copy(self.ball.position)
+                prev_vel = np.copy(self.ball.velocity)
 
-            # 检测碰撞
-            collision = self.game_map.check_collision(self.ball, self.mode_handler)
+                # 应用控制
+                if self.mode == 'non-gravity':
+                    direction = self.controller.get_direction()
+                    self.mode_handler.control_ball(self.ball, direction)
+                else:
+                    rotation = self.controller.get_rotation()
+                    self.mode_handler.rotate_map(rotation)
+                    self.mode_handler.apply_gravity_to_ball(self.ball)
 
-            if collision == "trap":
-                # 陷阱碰撞 - 重置到起点
-                if not self.reset_level():
-                    print("重置失败：找不到起始位置！")
+                self.ball.update_position()
+                # 精确碰撞检测
+                collision_info = self.game_map.check_collision(self.ball, self.mode_handler)
 
-            elif collision and ("wall" in collision or collision == "boundary"):
-                # 墙壁或边界碰撞 - 物理反弹
-                self.mode_handler.handle_collision(self.ball, collision)
-                # 回退到碰撞前位置
-                self.ball.position = prev_pos
+                if collision_info:
+                    if collision_info["type"] == "trap":
+                        if not self.reset_level():
+                            print("重置失败：找不到起始位置！")
+                        break
 
-            elif collision == "goal":
-                # 到达终点
-                self.is_completed = True
-                self.show_victory = True
-                self.victory_time = pygame.time.get_ticks()
+                    elif collision_info["type"] == "goal":
+                        self.is_completed = True
+                        self.show_victory = True
+                        self.victory_time = pygame.time.get_ticks()
+                        break
+
+                    else:  # 墙壁或边界碰撞
+
+                        # 打印碰撞信息
+                        print("happen")
+                        # 回退到碰撞前状态
+                        self.ball.position = prev_pos
+                        self.ball.velocity = prev_vel
+
+                        # 处理碰撞响应
+                        response = self.mode_handler.handle_collision(
+                            self.ball,
+                            collision_info["type"],
+                            collision_info["point"]
+                        )
+
+                        # 应用碰撞后的物理
+                        if self.mode == 'gravity':
+                            self.mode_handler.apply_gravity_to_ball(self.ball, response)
 
     def draw(self, screen):
         """绘制关卡"""
@@ -117,11 +136,7 @@ class Level:
 
         # 绘制小球
         if self.ball:
-            pygame.draw.circle(screen, self.ball.color,
-                               (int(self.ball.position[0] + self.game_map.offset_x),
-                                int(self.ball.position[1] + self.game_map.offset_y)),
-                               self.ball.radius)
-
+            self.ball.draw(screen, self.game_map.offset_x, self.game_map.offset_y, self.game_map.ui_scale)
         # 绘制UI：关卡数、难度、工具数量等
         font = pygame.font.SysFont(None, 36)
         level_text = font.render(f"Level: {self.level_number}", True, (0, 0, 0))
@@ -147,26 +162,3 @@ class Level:
                 next_rect = next_text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2 + 100))
                 screen.blit(next_text, next_rect)
 
-    def draw_debug(self, screen):
-        """绘制调试信息"""
-        if not self.game_map or not self.ball:
-            return
-
-        # 绘制球的实际碰撞框
-        ball_rect = pygame.Rect(
-            self.ball.position[0] + self.game_map.offset_x - self.ball.radius,
-            self.ball.position[1] + self.game_map.offset_y - self.ball.radius,
-            self.ball.radius * 2,
-            self.ball.radius * 2
-        )
-        pygame.draw.rect(screen, (255, 0, 0), ball_rect, 1)
-
-        # 绘制所有墙壁框
-        for wall in self.game_map.walls:
-            wall_rect = pygame.Rect(
-                wall[0] + self.game_map.offset_x,
-                wall[1] + self.game_map.offset_y,
-                wall[2],
-                wall[3]
-            )
-            pygame.draw.rect(screen, (0, 255, 0), wall_rect, 1)
