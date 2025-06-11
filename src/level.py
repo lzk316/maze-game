@@ -4,7 +4,6 @@ import numpy as np
 import pygame
 from ball import Ball
 from map import Map
-from thorn import Thorn
 from tool import Tool
 from controller import Controller
 from gravity_mode import GravityMode
@@ -15,6 +14,7 @@ from trap import Trap
 
 class Level:
     def __init__(self, level_number, difficulty, mode):
+        self.game = None
         self.victory_time = None
         self.show_victory = None
         self.level_number = level_number
@@ -44,13 +44,14 @@ class Level:
             self.start_x, self.start_y + self.button_height + self.spacing,
             self.button_width, self.button_height
         )
-        self.tools_button_rect = pygame.Rect(
+        self.mode_button_rect = pygame.Rect(
             self.start_x, self.start_y + 2 * (self.button_height + self.spacing),
             self.button_width, self.button_height
         )
 
         self.total_levels = len(glob.glob("assets/images/maze*.png"))
         self.show_level_list = False
+        self.is_selecting_level = False
 
 
 
@@ -60,7 +61,7 @@ class Level:
         self.is_completed = False
 
         try:
-            self.game_map = Map(map_file)
+            self.game_map = Map(map_file, difficulty=self.difficulty)
         except Exception as e:
             print(f"加载地图失败: {e}")
             return False
@@ -109,6 +110,8 @@ class Level:
                 position=self.game_map.end_position,
                 radius=self.game_map.end_radius
             )
+
+
 
         self.rotation_angle = 0
         return True
@@ -227,13 +230,18 @@ class Level:
         mouse_pos = pygame.mouse.get_pos()
 
         # 绘制关卡按钮
-        button_color = (220, 220, 220)  # 默认颜色
-        if self.level_button_rect.collidepoint(mouse_pos):
-            button_color = (180, 180, 255)  # 悬停颜色
-        pygame.draw.rect(screen, button_color, self.level_button_rect)
-        pygame.draw.rect(screen, (200, 200, 200), self.difficulty_button_rect)
-        pygame.draw.rect(screen, (200, 200, 200), self.tools_button_rect)
-
+        button_color1 = (220, 220, 220)  # 默认颜色
+        if not self.is_selecting_level and self.level_button_rect.collidepoint(mouse_pos):
+            button_color1 = (180, 180, 255)  # 悬停颜色
+        pygame.draw.rect(screen, button_color1, self.level_button_rect)
+        button_color2 = (220, 220, 220)  # 默认颜色
+        if not self.is_selecting_level and self.difficulty_button_rect.collidepoint(mouse_pos):
+            button_color2 = (180, 180, 255)  # 悬停颜色
+        pygame.draw.rect(screen, button_color2, self.difficulty_button_rect)
+        button_color3 = (220, 220, 220)  # 默认颜色
+        if not self.is_selecting_level and self.mode_button_rect.collidepoint(mouse_pos):
+            button_color3 = (180, 180, 255)  # 悬停颜色
+        pygame.draw.rect(screen, button_color3, self.mode_button_rect)
         # 添加文本到按钮
         font = pygame.font.SysFont(None, 36)
 
@@ -247,10 +255,10 @@ class Level:
         screen.blit(diff_text, (self.difficulty_button_rect.centerx - diff_text.get_width() // 2,
                                 self.difficulty_button_rect.centery - diff_text.get_height() // 2))
 
-        # Tools按钮文本
-        tool_text = font.render(f"Tools: {self.tool.count}", True, (0, 0, 0))
-        screen.blit(tool_text, (self.tools_button_rect.centerx - tool_text.get_width() // 2,
-                                self.tools_button_rect.centery - tool_text.get_height() // 2))
+        # mode按钮文本
+        mode_text = font.render(f"Mode: {self.mode}", True, (0, 0, 0))
+        screen.blit(mode_text, (self.mode_button_rect.centerx - mode_text.get_width() // 2,
+                                self.mode_button_rect.centery - mode_text.get_height() // 2))
 
         if self.show_level_list:
             list_start_y = self.level_button_rect.bottom + 50
@@ -290,6 +298,16 @@ class Level:
             text_rect = victory_text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
             screen.blit(victory_text, text_rect)
 
+    def switch_mode(self, new_mode):
+        """切换游戏模式"""
+        if new_mode in ['gravity', 'non-gravity']:
+            self.mode = new_mode
+            # 重新初始化关卡以适应新模式
+            map_file = f"maze{self.level_number}.png"
+            self.start_level(map_file)
+            return True
+        return False
+
     def handle_event(self, event):
         if event.type == pygame.QUIT:
             running = False
@@ -299,6 +317,7 @@ class Level:
             # 检查是否点击了关卡按钮
             if self.level_button_rect.collidepoint(mouse_pos):
                 self.show_level_list = not self.show_level_list
+                self.is_selecting_level = self.show_level_list
 
             # 如果正在显示关卡列表，检查是否点击了具体的关卡名
             if self.show_level_list:
@@ -320,3 +339,18 @@ class Level:
                         self.start_level(map_file)
                         self.show_level_list = False  # 关闭关卡列表显示
                         break  # 找到匹配后退出循环
+
+            if self.difficulty_button_rect.collidepoint(mouse_pos):
+                # 切换难度
+                if self.difficulty == "easy":
+                    self.difficulty = "hard"
+                else:
+                    self.difficulty = "easy"
+                # 重新加载关卡以应用新的难度设置
+                map_file = f"maze{self.level_number}.png"
+                self.start_level(map_file)
+
+            if self.mode_button_rect.collidepoint(mouse_pos):
+                # 切换模式
+                new_mode = 'non-gravity' if self.mode == 'gravity' else 'gravity'
+                self.switch_mode(new_mode)

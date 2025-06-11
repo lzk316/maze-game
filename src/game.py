@@ -40,16 +40,6 @@ class Game:
             return self.current_level.reset_level()
         return False
 
-    def switch_mode(self, new_mode):
-        """切换游戏模式"""
-        if self.current_level and new_mode in ['gravity', 'non-gravity']:
-            self.game_mode = new_mode
-            # 这里需要重新初始化关卡以适应新模式
-            level_number = self.current_level.level_number
-            difficulty = self.current_level.difficulty
-            self.start_level(level_number, difficulty, new_mode)
-            return True
-        return False
 
     def run(self):
         """游戏主循环"""

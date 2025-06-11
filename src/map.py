@@ -7,8 +7,9 @@ import os
 from pathlib import Path
 
 class Map:
-    def __init__(self, image_path, scale=100):
+    def __init__(self, image_path, scale=100, difficulty="hard"):
         # 构建正确的图片路径
+        self.difficulty = difficulty
         base_dir = Path(__file__).parent.parent  # 获取上级目录
         full_path = base_dir / "assets" / "images" / image_path
 
@@ -69,9 +70,10 @@ class Map:
                     self.traps.append(Trap(trap_pos, self.obstacle_radius))
                 # 紫色是荆棘 (255, 0, 255)
                 elif (pixel == [255, 0, 255]).all():
-                    thorn_pos = (x * self.scale + self.scale // 2,
+                    if self.difficulty == "hard":
+                        thorn_pos = (x * self.scale + self.scale // 2,
                                  y * self.scale + self.scale // 2)
-                    self.thorns.append(Thorn(thorn_pos, size=300))
+                        self.thorns.append(Thorn(thorn_pos, size=300))
                 # 蓝色是终点 (0, 0, 255)
                 elif (pixel == [0, 0, 255]).all():
                     self.end_position = (x * self.scale + self.scale // 2,
