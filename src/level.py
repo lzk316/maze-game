@@ -10,7 +10,7 @@ from gravity_mode import GravityMode
 from non_gravity_mode import NonGravityMode
 from physics import PhysicsWorld
 from trap import Trap
-
+import time
 
 class Level:
     def __init__(self, level_number, difficulty, mode):
@@ -53,12 +53,13 @@ class Level:
         self.show_level_list = False
         self.is_selecting_level = False
 
-
+        self.guards = []
 
     def start_level(self, map_file=None):
         """开始关卡"""
         self.attempts += 1
         self.is_completed = False
+        self.guards = []  # 重置守卫列表
 
         try:
             self.game_map = Map(map_file, difficulty=self.difficulty)
@@ -111,6 +112,13 @@ class Level:
                 radius=self.game_map.end_radius
             )
 
+        if self.difficulty == 'hard' and self.game_map.guards:
+            for guard in self.game_map.guards:
+                guard.box2d_body = self.world.create_guard(
+                    position=guard.position,
+                    radius=guard.radius
+                )
+                self.guards.append(guard)
 
 
         self.rotation_angle = 0
@@ -125,6 +133,16 @@ class Level:
                 if self.ball.box2d_body:
                     self.ball.box2d_body.position = (start_pos[0]/self.world.PPM, start_pos[1]/self.world.PPM)
                     self.ball.box2d_body.linearVelocity = (0, 0)
+
+                for guard in self.guards:
+                    guard.position = np.array(guard.patrol_points[0])  # 重置到初始巡逻点
+                    if guard.box2d_body:
+                        guard.box2d_body.position = (
+                        guard.position[0] / self.world.PPM, guard.position[1] / self.world.PPM)
+                    guard.state = "patrol"  # 重置状态
+                    guard.patrol_target = 0  # 重置巡逻目标
+                    guard.path = []  # 清空路径
+
                 self.is_completed = False  # 重置完成状态
                 self.show_victory = False  # 重置通关显示
                 self.rotation_angle = 0
@@ -192,6 +210,21 @@ class Level:
                         self.reset_level()
                         break
 
+            current_time = time.time()
+            for guard in self.guards:
+                guard.update(self.game_map, self.ball.position, current_time)
+
+                # 更新物理实体位置
+                if guard.box2d_body:
+                    guard.box2d_body.position = (guard.position[0] / self.world.PPM,
+                                                 guard.position[1] / self.world.PPM)
+
+            # 检查是否触碰守卫 - 新增
+            for guard in self.guards:
+                if guard.check_collision(self.ball):
+                    self.reset_level()
+                    break
+
 
     def draw(self, screen):
         """绘制关卡"""
@@ -210,6 +243,9 @@ class Level:
         self.game_map.draw(rotated_screen)
         if self.ball:
             self.ball.draw(rotated_screen, self.game_map.offset_x, self.game_map.offset_y, self.game_map.ui_scale)
+
+        for guard in self.guards:
+            guard.draw(rotated_screen, self.game_map.offset_x, self.game_map.offset_y, self.game_map.ui_scale)
 
         # 旋转整个地图和小球
         if self.rotation_angle != 0:

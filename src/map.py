@@ -3,6 +3,7 @@ import numpy as np
 from obstacle import Obstacle
 from thorn import Thorn
 from trap import Trap
+from guard import Guard
 import os
 from pathlib import Path
 
@@ -45,7 +46,7 @@ class Map:
         self.screen_height = 0
         self.offset_x = 0
         self.offset_y = 0
-
+        self.guards = []
         self.parse_map()
 
     def parse_map(self):
@@ -74,6 +75,12 @@ class Map:
                         thorn_pos = (x * self.scale + self.scale // 2,
                                  y * self.scale + self.scale // 2)
                         self.thorns.append(Thorn(thorn_pos, size=300))
+                # 黄色是守卫 (255, 255, 0)
+                elif (pixel == [255, 255, 0]).all():
+                    if self.difficulty == "hard":
+                        guard_pos = (x * self.scale + self.scale // 2,
+                                     y * self.scale + self.scale // 2)
+                        self.guards.append(Guard(guard_pos))
                 # 蓝色是终点 (0, 0, 255)
                 elif (pixel == [0, 0, 255]).all():
                     self.end_position = (x * self.scale + self.scale // 2,

@@ -113,6 +113,36 @@ class PhysicsWorld:
         }
         return body
 
+    def create_guard(self, position, radius):
+        """创建静态圆形障碍物"""
+        position_m = (position[0] / self.PPM, position[1] / self.PPM)
+        radius_m = radius / self.PPM
+
+        # 创建静态物体定义
+        body_def = Box2D.b2BodyDef()
+        body_def.type = b2_staticBody
+        body_def.position = position_m
+
+        # 创建物体
+        body = self.world.CreateBody(body_def)
+
+        # 创建圆形夹具
+        shape = b2CircleShape(radius=radius_m)
+        fixture_def = Box2D.b2FixtureDef(
+            shape=shape,
+            friction=0.3,
+            restitution=0.1
+        )
+        body.CreateFixture(fixture_def)
+
+        # 存储物体信息
+        self.bodies[id(body)] = {
+            'type': 'guard',  # 修改类型为guard
+            'radius': radius,
+            'body': body
+        }
+        return body
+
     def set_rotation_center(self, center):
         """设置旋转中心点"""
         self.rotation_center = center
