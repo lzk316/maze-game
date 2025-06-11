@@ -1,6 +1,7 @@
 import pygame
 import numpy as np
 from obstacle import Obstacle
+from thorn import Thorn
 from trap import Trap
 import os
 from pathlib import Path
@@ -33,6 +34,7 @@ class Map:
         # 游戏元素
         self.walls = []
         self.traps = []
+        self.thorns = []
         self.start_position = None
         self.end_position = None
         self.obstacle_radius = 150
@@ -65,6 +67,11 @@ class Map:
                     trap_pos = (x * self.scale + self.scale // 2,
                                 y * self.scale + self.scale // 2)
                     self.traps.append(Trap(trap_pos, self.obstacle_radius))
+                # 紫色是荆棘 (255, 0, 255)
+                elif (pixel == [255, 0, 255]).all():
+                    thorn_pos = (x * self.scale + self.scale // 2,
+                                 y * self.scale + self.scale // 2)
+                    self.thorns.append(Thorn(thorn_pos, size=300))
                 # 蓝色是终点 (0, 0, 255)
                 elif (pixel == [0, 0, 255]).all():
                     self.end_position = (x * self.scale + self.scale // 2,
@@ -115,6 +122,23 @@ class Map:
                 (int(screen_pos[0]), int(screen_pos[1])),
                 int(trap.radius * self.ui_scale)
             )
+
+        for thorn in self.thorns:
+            if thorn.is_visible:
+                # 缩小到UI坐标并加上偏移量
+                screen_pos = (
+                    thorn.position[0] * self.ui_scale + self.offset_x,
+                    thorn.position[1] * self.ui_scale + self.offset_y
+                )
+                # 绘制荆棘（边长也缩小10倍）
+                pygame.draw.rect(
+                    screen,
+                    thorn.color,
+                    (screen_pos[0] - thorn.size // 2 * self.ui_scale,
+                     screen_pos[1] - thorn.size // 2 * self.ui_scale,
+                     thorn.size * self.ui_scale,
+                     thorn.size * self.ui_scale)
+                )
 
         # 绘制终点
         if self.end_position:

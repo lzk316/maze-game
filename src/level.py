@@ -2,11 +2,14 @@ import numpy as np
 import pygame
 from ball import Ball
 from map import Map
+from thorn import Thorn
 from tool import Tool
 from controller import Controller
 from gravity_mode import GravityMode
 from non_gravity_mode import NonGravityMode
 from physics import PhysicsWorld
+from trap import Trap
+
 
 class Level:
     def __init__(self, level_number, difficulty, mode):
@@ -150,6 +153,13 @@ class Level:
                     trap.activate()
                     self.reset_level()
                     break
+
+                # 检查是否触碰荆棘
+            for thorn in self.game_map.thorns:
+                if thorn.check_collision(self.ball):
+                    if thorn.activate():  # 激活荆棘并检查是否需要重置小球
+                        self.reset_level()
+                        break
 
     def draw(self, screen):
         """绘制关卡"""
