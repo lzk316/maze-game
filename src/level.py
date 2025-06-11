@@ -111,14 +111,25 @@ class Level:
             if self.mode == 'non-gravity':
                 direction = self.controller.get_direction()
                 if direction:
-                    force = np.array(direction) * 50000 # 调整力的大小
+                    force = np.array(direction) * 50000  # 调整力的大小
                     self.world.apply_force_to_ball(self.ball.box2d_body, force)
             else:
                 rotation = self.controller.get_rotation()
                 if rotation:
-                    angle = self.gravity_mode.rotate_map(rotation)
-                    self.rotation_angle += angle
-                    self.world.rotate_world(angle)
+                    # 仅更新旋转角度（UI渲染时使用），不实际旋转物理世界
+                    if rotation == 'left':
+                        self.rotation_angle += self.gravity_mode.rotation_speed * self.gravity_mode.time_step
+                        # 重力方向与UI旋转方向相反
+                        gravity_angle = -self.rotation_angle
+                    elif rotation == 'right':
+                        self.rotation_angle -= self.gravity_mode.rotation_speed * self.gravity_mode.time_step
+                        # 重力方向与UI旋转方向相反
+                        gravity_angle = -self.rotation_angle
+
+                    # 将重力方向转换为Box2D的重力向量
+                    gravity_x = 9.8 * np.sin(gravity_angle)
+                    gravity_y = 9.8 * np.cos(gravity_angle)
+                    self.world.set_gravity((gravity_x, gravity_y))
 
             # 检查是否达到终点
             if self.game_map.end_position:
@@ -145,12 +156,26 @@ class Level:
         if not self.game_map:
             return
 
-        # 绘制地图
-        self.game_map.draw(screen, self.rotation_angle)
+        # 计算地图中心点（旋转中心）
+        map_center_x = self.game_map.ui_width // 2 + self.game_map.offset_x
+        map_center_y = self.game_map.ui_height // 2 + self.game_map.offset_y
 
-        # 绘制小球
+        # 绘制背景
+        screen.fill((240, 240, 240))  # 浅灰色背景
+
+        # 应用旋转
+        rotated_screen = pygame.Surface((screen.get_width(), screen.get_height()), pygame.SRCALPHA)
+        self.game_map.draw(rotated_screen)
         if self.ball:
-            self.ball.draw(screen, self.game_map.offset_x, self.game_map.offset_y, self.game_map.ui_scale)
+            self.ball.draw(rotated_screen, self.game_map.offset_x, self.game_map.offset_y, self.game_map.ui_scale)
+
+        # 旋转整个地图和小球
+        if self.rotation_angle != 0:
+            rotated_image = pygame.transform.rotate(rotated_screen, np.degrees(self.rotation_angle))
+            rotated_rect = rotated_image.get_rect(center=(map_center_x, map_center_y))
+            screen.blit(rotated_image, rotated_rect)
+        else:
+            screen.blit(rotated_screen, (0, 0))  # 直接绘制未旋转的图像
 
         # 绘制UI：关卡数、难度、工具数量等
         font = pygame.font.SysFont(None, 36)

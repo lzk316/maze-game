@@ -3,7 +3,7 @@ import pygame
 
 
 class Ball:
-    def __init__(self, position, radius=150, density=1.0, friction=0.1, restitution=0.3):
+    def __init__(self, position, radius=150, density=1.0, friction=0.1, restitution=0.1):
         self.position = np.array(position, dtype=float)
         self.radius = radius
         self.color = (0, 255, 0)

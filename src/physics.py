@@ -16,7 +16,11 @@ class PhysicsWorld:
         self.bodies = {}
         self.rotation_center = None
 
-    def create_ball(self, position, radius, density=1.0, friction=0.1, restitution=0.3):
+    def set_gravity(self, gravity):
+        """设置重力方向"""
+        self.world.gravity = gravity
+
+    def create_ball(self, position, radius, density=1.0, friction=0.1, restitution=0.1):
         """创建球体物理实体"""
         position_m = (position[0] / self.PPM, position[1] / self.PPM)
         radius_m = radius / self.PPM
@@ -153,7 +157,6 @@ class PhysicsWorld:
             self.position_iterations
         )
         self.world.ClearForces()
-
 
     def get_body_position(self, body):
         """获取物理实体的位置（像素单位）"""
