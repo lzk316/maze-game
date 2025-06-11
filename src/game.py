@@ -60,7 +60,7 @@ class Game:
                     running = False
                 if self.current_level:
                     self.current_level.controller.handle_event(event)
-
+                    self.current_level.handle_event(event)
             # 更新游戏状态
             if self.current_level:
                 self.current_level.update()

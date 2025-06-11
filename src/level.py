@@ -1,3 +1,5 @@
+import glob
+
 import numpy as np
 import pygame
 from ball import Ball
@@ -28,6 +30,29 @@ class Level:
         self.non_gravity_mode = NonGravityMode()
         self.world = None
         self.rotation_angle = 0
+
+        self.start_x = 50
+        self.start_y = 200
+        self.button_width = 250
+        self.button_height = 100
+        self.spacing = 150
+        self.level_button_rect = pygame.Rect(
+            self.start_x, self.start_y,
+            self.button_width, self.button_height
+        )
+        self.difficulty_button_rect = pygame.Rect(
+            self.start_x, self.start_y + self.button_height + self.spacing,
+            self.button_width, self.button_height
+        )
+        self.tools_button_rect = pygame.Rect(
+            self.start_x, self.start_y + 2 * (self.button_height + self.spacing),
+            self.button_width, self.button_height
+        )
+
+        self.total_levels = len(glob.glob("assets/images/maze*.png"))
+        self.show_level_list = False
+
+
 
     def start_level(self, map_file=None):
         """开始关卡"""
@@ -85,7 +110,7 @@ class Level:
                 radius=self.game_map.end_radius
             )
 
-
+        self.rotation_angle = 0
         return True
 
     def reset_level(self):
@@ -97,6 +122,9 @@ class Level:
                 if self.ball.box2d_body:
                     self.ball.box2d_body.position = (start_pos[0]/self.world.PPM, start_pos[1]/self.world.PPM)
                     self.ball.box2d_body.linearVelocity = (0, 0)
+                self.is_completed = False  # 重置完成状态
+                self.show_victory = False  # 重置通关显示
+                self.rotation_angle = 0
                 return True
         return False
 
@@ -114,7 +142,7 @@ class Level:
             if self.mode == 'non-gravity':
                 direction = self.controller.get_direction()
                 if direction:
-                    force = np.array(direction) * 50000  # 调整力的大小
+                    force = np.array(direction) * 10000  # 调整力的大小
                     self.world.apply_force_to_ball(self.ball.box2d_body, force)
             else:
                 rotation = self.controller.get_rotation()
@@ -142,7 +170,7 @@ class Level:
                 if distance < (self.ball.radius + self.game_map.end_radius):
                     self.is_completed = True
                     self.show_victory = True
-                    self.victory_time = pygame.time.get_ticks()
+
 
             # 检查是否触碰陷阱
             for trap in self.game_map.traps:
@@ -160,6 +188,7 @@ class Level:
                     if thorn.activate():  # 激活荆棘并检查是否需要重置小球
                         self.reset_level()
                         break
+
 
     def draw(self, screen):
         """绘制关卡"""
@@ -188,26 +217,106 @@ class Level:
             screen.blit(rotated_screen, (0, 0))  # 直接绘制未旋转的图像
 
         # 绘制UI：关卡数、难度、工具数量等
+        button_width = 250
+        button_height = 100
+        spacing = 150
+        start_x = 50
+        start_y = 200
+
+        # 绘制按钮
+        mouse_pos = pygame.mouse.get_pos()
+
+        # 绘制关卡按钮
+        button_color = (220, 220, 220)  # 默认颜色
+        if self.level_button_rect.collidepoint(mouse_pos):
+            button_color = (180, 180, 255)  # 悬停颜色
+        pygame.draw.rect(screen, button_color, self.level_button_rect)
+        pygame.draw.rect(screen, (200, 200, 200), self.difficulty_button_rect)
+        pygame.draw.rect(screen, (200, 200, 200), self.tools_button_rect)
+
+        # 添加文本到按钮
         font = pygame.font.SysFont(None, 36)
+
+        # Level按钮文本
         level_text = font.render(f"Level: {self.level_number}", True, (0, 0, 0))
-        screen.blit(level_text, (20, 20))
+        screen.blit(level_text, (self.level_button_rect.centerx - level_text.get_width() // 2,
+                                 self.level_button_rect.centery - level_text.get_height() // 2))
 
+        # Difficulty按钮文本
         diff_text = font.render(f"Difficulty: {self.difficulty}", True, (0, 0, 0))
-        screen.blit(diff_text, (20, 60))
+        screen.blit(diff_text, (self.difficulty_button_rect.centerx - diff_text.get_width() // 2,
+                                self.difficulty_button_rect.centery - diff_text.get_height() // 2))
 
+        # Tools按钮文本
         tool_text = font.render(f"Tools: {self.tool.count}", True, (0, 0, 0))
-        screen.blit(tool_text, (20, 100))
+        screen.blit(tool_text, (self.tools_button_rect.centerx - tool_text.get_width() // 2,
+                                self.tools_button_rect.centery - tool_text.get_height() // 2))
+
+        if self.show_level_list:
+            list_start_y = self.level_button_rect.bottom + 50
+
+            level_list_text = font.render("选择关卡:", True, (0, 0, 0))
+            screen.blit(level_list_text, (start_x, list_start_y))
+
+            # 添加背景使列表更易读
+            list_background = pygame.Rect(
+                start_x - 10,
+                list_start_y - 10,
+                button_width + 20,
+                (self.total_levels + 1) * 50 + 20
+            )
+            pygame.draw.rect(screen, (230, 230, 230), list_background)
+            pygame.draw.rect(screen, (100, 100, 100), list_background, 2)  # 边框
+
+            for i, level_num in enumerate(range(1, self.total_levels + 1)):
+                level_rect = pygame.Rect(
+                    start_x,
+                    list_start_y + (i + 1) * 50,
+                    button_width,
+                    40
+                )
+
+                # 高亮显示当前选中的关卡
+                if level_num == self.level_number:
+                    pygame.draw.rect(screen, (180, 230, 255), level_rect)
+
+                level_text = font.render(f"maze{level_num}.png", True, (0, 0, 0))
+                screen.blit(level_text, (level_rect.x + 10, level_rect.centery - level_text.get_height() // 2))
 
         # 通关显示
         if self.is_completed and self.show_victory:
             victory_font = pygame.font.SysFont(None, 72)
-            victory_text = victory_font.render("关卡完成!", True, (0, 255, 0))
+            victory_text = victory_font.render("Success!", True, (255, 0, 0))
             text_rect = victory_text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2))
             screen.blit(victory_text, text_rect)
 
-            # 3秒后显示下一关提示
-            if pygame.time.get_ticks() - self.victory_time > 3000:
-                next_font = pygame.font.SysFont(None, 48)
-                next_text = next_font.render("按N键进入下一关", True, (0, 0, 255))
-                next_rect = next_text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2 + 100))
-                screen.blit(next_text, next_rect)
+    def handle_event(self, event):
+        if event.type == pygame.QUIT:
+            running = False
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_pos = event.pos
+
+            # 检查是否点击了关卡按钮
+            if self.level_button_rect.collidepoint(mouse_pos):
+                self.show_level_list = not self.show_level_list
+
+            # 如果正在显示关卡列表，检查是否点击了具体的关卡名
+            if self.show_level_list:
+                # 计算列表起始位置（与draw方法中一致）
+                list_start_y = self.level_button_rect.bottom + 50
+
+                for i, level_num in enumerate(range(1, self.total_levels + 1)):
+                    level_rect = pygame.Rect(
+                        self.start_x,
+                        list_start_y + (i + 1) * 50,
+                        self.button_width,
+                        40
+                    )
+
+                    if level_rect.collidepoint(mouse_pos):
+                        # 选择该关卡
+                        self.level_number = level_num
+                        map_file = f"maze{self.level_number}.png"
+                        self.start_level(map_file)
+                        self.show_level_list = False  # 关闭关卡列表显示
+                        break  # 找到匹配后退出循环

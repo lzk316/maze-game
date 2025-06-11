@@ -5,6 +5,7 @@ import pygame
 class Controller:
     def __init__(self, input_type='keyboard'):
         self.input_type = input_type
+        self.level = None
         # 非重力模式控制
         self.current_direction = None
         # 重力模式控制

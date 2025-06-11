@@ -19,10 +19,10 @@ class Thorn(Obstacle):
 
         # 计算正方形的边界
         half_size = self.size // 2
-        left = center_x - half_size
-        right = center_x + half_size
-        top = center_y - half_size
-        bottom = center_y + half_size
+        left = center_x - half_size - 10  # 向左扩展10像素
+        right = center_x + half_size + 10  # 向右扩展10像素
+        top = center_y - half_size - 10  # 向上扩展10像素
+        bottom = center_y + half_size + 10  # 向下扩展10像素
 
         # 检查是否在正方形范围内
         if left <= ball_x <= right and top <= ball_y <= bottom:
