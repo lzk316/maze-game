@@ -1,4 +1,6 @@
+
 import pygame
+
 
 class Controller:
     def __init__(self, input_type='keyboard'):

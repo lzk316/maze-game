@@ -9,12 +9,17 @@ class Obstacle:
         self.is_active = True
 
     def check_collision(self, ball):
-        """检查与球的碰撞"""
-        if not self.is_active:
-            return False
+        # 计算两点间距离
+        dx = self.position[0] - ball.position[0]
+        dy = self.position[1] - ball.position[1]
+        distance = (dx ** 2 + dy ** 2) ** 0.5
 
-        distance = np.linalg.norm(ball.position - self.position)
-        return distance < (ball.radius + self.radius)
+        # 判断是否碰撞
+        if distance < self.radius + ball.radius:
+            print(f"[DEBUG] 陷阱碰撞发生！位置: {self.position}, 小球位置: {ball.position}")
+            ball.reset_position()
+            return True
+        return False
 
     def activate(self):
         """激活障碍物效果"""

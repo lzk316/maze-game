@@ -4,9 +4,9 @@ from ball import Ball
 from map import Map
 from tool import Tool
 from controller import Controller
-from non_gravity_mode import NonGravityMode
 from gravity_mode import GravityMode
-
+from non_gravity_mode import NonGravityMode
+from physics import PhysicsWorld
 
 class Level:
     def __init__(self, level_number, difficulty, mode):
@@ -21,12 +21,10 @@ class Level:
         self.game_map = None
         self.tool = Tool()
         self.controller = Controller()
-
-        # 根据模式初始化
-        if mode == 'non-gravity':
-            self.mode_handler = NonGravityMode()
-        else:
-            self.mode_handler = GravityMode()
+        self.gravity_mode = GravityMode()
+        self.non_gravity_mode = NonGravityMode()
+        self.world = None
+        self.rotation_angle = 0
 
     def start_level(self, map_file=None):
         """开始关卡"""
@@ -47,81 +45,100 @@ class Level:
 
         self.ball = Ball(start_pos)
 
+        # 初始化物理世界
+        if self.mode == 'gravity':
+            self.world = PhysicsWorld(gravity=(0, 9.8), pixels_per_meter=100)
+        else:
+            self.world = PhysicsWorld(gravity=(0, 0), pixels_per_meter=100)
 
+        # 创建小球的物理实体
+        self.ball.box2d_body = self.world.create_ball(
+            position=start_pos,
+            radius=self.ball.radius,
+            density=1.0,
+            friction=0.1,
+            restitution=0.3
+        )
 
-        map_center = (
-            self.game_map.game_width // 2,
-            self.game_map.game_height // 2
+        # 创建墙壁的物理实体
+        for wall in self.game_map.walls:
+            x, y, w, h = wall
+            self.world.create_static_box(
+                position=(x + w/2, y + h/2),
+                size=(w, h)
             )
-        self.mode_handler.set_rotation_center(map_center)
 
-        # 根据难度初始化工具
-        if self.difficulty == 'easy':
-            self.tool.increase_count(3)  # 简单模式给3个工具
+        # 创建陷阱的物理实体
+        for trap in self.game_map.traps:
+            self.world.create_static_circle(
+                position=trap.position,
+                radius=trap.radius
+            )
+
+        # 创建终点的物理实体
+        if self.game_map.end_position:
+            self.world.create_static_circle(
+                position=self.game_map.end_position,
+                radius=self.game_map.end_radius
+            )
+
 
         return True
 
     def reset_level(self):
         """重置关卡"""
-        if self.game_map:
+        if self.game_map and self.ball:
             start_pos = self.game_map.get_start_position()
             if start_pos:
                 self.ball.reset_position(start_pos)
+                if self.ball.box2d_body:
+                    self.ball.box2d_body.position = (start_pos[0]/self.world.PPM, start_pos[1]/self.world.PPM)
+                    self.ball.box2d_body.linearVelocity = (0, 0)
                 return True
         return False
 
     def update(self):
         if not self.is_completed and self.ball and self.game_map:
-            # 增加子步数以提高精度
-            sub_steps = 8  # 增加到8个子步
+            # 更新物理世界
+            if self.world:
+                self.world.step()
 
-            for _ in range(sub_steps):
-                prev_pos = np.copy(self.ball.position)
-                prev_vel = np.copy(self.ball.velocity)
+            # 更新小球的渲染位置
+            if self.ball.box2d_body:
+                self.ball.update_from_box2d(self.ball.box2d_body)
 
-                # 应用控制
-                if self.mode == 'non-gravity':
-                    direction = self.controller.get_direction()
-                    self.mode_handler.control_ball(self.ball, direction)
-                else:
-                    rotation = self.controller.get_rotation()
-                    self.mode_handler.rotate_map(rotation)
-                    self.mode_handler.apply_gravity_to_ball(self.ball)
+            # 应用用户输入控制
+            if self.mode == 'non-gravity':
+                direction = self.controller.get_direction()
+                if direction:
+                    force = np.array(direction) * 50000 # 调整力的大小
+                    self.world.apply_force_to_ball(self.ball.box2d_body, force)
+            else:
+                rotation = self.controller.get_rotation()
+                if rotation:
+                    angle = self.gravity_mode.rotate_map(rotation)
+                    self.rotation_angle += angle
+                    self.world.rotate_world(angle)
 
-                self.ball.update_position()
-                # 精确碰撞检测
-                collision_info = self.game_map.check_collision(self.ball, self.mode_handler)
+            # 检查是否达到终点
+            if self.game_map.end_position:
+                end_pos = np.array(self.game_map.end_position)
+                ball_pos = self.ball.position
+                distance = np.linalg.norm(ball_pos - end_pos)
+                if distance < (self.ball.radius + self.game_map.end_radius):
+                    self.is_completed = True
+                    self.show_victory = True
+                    self.victory_time = pygame.time.get_ticks()
 
-                if collision_info:
-                    if collision_info["type"] == "trap":
-                        if not self.reset_level():
-                            print("重置失败：找不到起始位置！")
-                        break
-
-                    elif collision_info["type"] == "goal":
-                        self.is_completed = True
-                        self.show_victory = True
-                        self.victory_time = pygame.time.get_ticks()
-                        break
-
-                    else:  # 墙壁或边界碰撞
-
-                        # 打印碰撞信息
-                        print("happen")
-                        # 回退到碰撞前状态
-                        self.ball.position = prev_pos
-                        self.ball.velocity = prev_vel
-
-                        # 处理碰撞响应
-                        response = self.mode_handler.handle_collision(
-                            self.ball,
-                            collision_info["type"],
-                            collision_info["point"]
-                        )
-
-                        # 应用碰撞后的物理
-                        if self.mode == 'gravity':
-                            self.mode_handler.apply_gravity_to_ball(self.ball, response)
+            # 检查是否触碰陷阱
+            for trap in self.game_map.traps:
+                trap_pos = np.array(trap.position)
+                ball_pos = self.ball.position
+                distance = np.linalg.norm(ball_pos - trap_pos)
+                if distance < (self.ball.radius + trap.radius + 20):
+                    trap.activate()
+                    self.reset_level()
+                    break
 
     def draw(self, screen):
         """绘制关卡"""
@@ -129,14 +146,12 @@ class Level:
             return
 
         # 绘制地图
-        if self.mode == 'gravity':
-            self.game_map.draw(screen, self.mode_handler)
-        else:
-            self.game_map.draw(screen)
+        self.game_map.draw(screen, self.rotation_angle)
 
         # 绘制小球
         if self.ball:
             self.ball.draw(screen, self.game_map.offset_x, self.game_map.offset_y, self.game_map.ui_scale)
+
         # 绘制UI：关卡数、难度、工具数量等
         font = pygame.font.SysFont(None, 36)
         level_text = font.render(f"Level: {self.level_number}", True, (0, 0, 0))
@@ -161,4 +176,3 @@ class Level:
                 next_text = next_font.render("按N键进入下一关", True, (0, 0, 255))
                 next_rect = next_text.get_rect(center=(screen.get_width() // 2, screen.get_height() // 2 + 100))
                 screen.blit(next_text, next_rect)
-

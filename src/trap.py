@@ -9,6 +9,7 @@ class Trap(Obstacle):
     def activate(self):
         """激活陷阱"""
         super().activate()
+        print(f"陷阱激活！位置: {self.position}")
         return True  # 返回True表示需要重置关卡
 
     def draw(self, screen):

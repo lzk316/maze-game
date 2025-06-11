@@ -1,7 +1,9 @@
 import pygame
 from level import Level
+from physics import PhysicsWorld
 from player import Player
-
+import sys
+import numpy as np
 
 class Game:
     def __init__(self, screen_width=1600, screen_height=1000):
@@ -11,16 +13,18 @@ class Game:
         self.player = Player()
         self.current_level = None
         self.game_mode = None  # 'gravity' or 'non-gravity'
+        self.physics_world = None
 
     def start_level(self, level_number, difficulty, mode):
         """开始指定关卡"""
         self.current_level = Level(level_number, difficulty, mode)
         self.game_mode = mode
 
-        # 初始化旋转中心
-        if mode == 'gravity' and self.current_level.mode_handler:
-            center = (self.screen.get_width() // 2, self.screen.get_height() // 2)
-            self.current_level.mode_handler.set_rotation_center(center)
+        # 初始化物理世界
+        if mode == 'gravity':
+            self.physics_world = PhysicsWorld(gravity=(0, 9.8), pixels_per_meter=100)
+        else:
+            self.physics_world = PhysicsWorld(gravity=(0, 0), pixels_per_meter=100)
 
         # 构建地图文件名
         map_file = f"maze{level_number}.png"
@@ -54,7 +58,6 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
-                    # 将事件传递给控制器
                 if self.current_level:
                     self.current_level.controller.handle_event(event)
 
@@ -63,12 +66,12 @@ class Game:
                 self.current_level.update()
 
             # 渲染
-            self.screen.fill((255, 255, 255))  # 黑色背景
+            self.screen.fill((255, 255, 255))  # 白色背景
             if self.current_level:
                 self.current_level.draw(self.screen)
 
             pygame.display.flip()
             self.clock.tick(60)  # 60 FPS
 
-
         pygame.quit()
+        sys.exit()
