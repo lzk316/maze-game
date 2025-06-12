@@ -4,16 +4,16 @@ from obstacle import Obstacle
 class Trap(Obstacle):
     def __init__(self, position, radius=150):
         super().__init__(position, radius)
-        self.color = (255, 0, 0)  # 红色
+        self.color = (255, 0, 0)
 
     def activate(self):
-        """激活陷阱"""
+
         super().activate()
-        print(f"陷阱激活！位置: {self.position}")
-        return True  # 返回True表示需要重置关卡
+        print(f"3{self.position}")
+        return True
 
     def draw(self, screen):
-        """绘制陷阱"""
+
         pygame.draw.circle(screen, self.color,
                            (int(self.position[0]), int(self.position[1])),
                            self.radius)
