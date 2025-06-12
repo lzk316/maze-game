@@ -14,3 +14,4 @@ class Tool:
         """增加工具数量"""
         self.count += amount
         return self.count
+

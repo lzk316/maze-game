@@ -1,4 +1,5 @@
 import glob
+import random
 
 import numpy as np
 import pygame
@@ -48,6 +49,20 @@ class Level:
             self.start_x, self.start_y + 2 * (self.button_height + self.spacing),
             self.button_width, self.button_height
         )
+        screen_width = 1600  # 屏幕宽度
+        right_start_x = screen_width - self.start_x - self.button_width
+        self.reset_button_rect = pygame.Rect(
+            right_start_x, self.start_y,
+            self.button_width, self.button_height
+        )
+        self.tool_button_rect = pygame.Rect(
+            right_start_x, self.start_y + self.button_height + self.spacing,
+            self.button_width, self.button_height
+        )
+        self.help_button_rect = pygame.Rect(
+            right_start_x, self.start_y + 2 * (self.button_height + self.spacing),
+            self.button_width, self.button_height
+        )
 
         self.total_levels = len(glob.glob("assets/images/maze*.png"))
         self.show_level_list = False
@@ -55,11 +70,16 @@ class Level:
 
         self.guards = []
 
+        self.reset_count = 0  # 重置次数计数器
+        self.show_help = False  # 帮助显示标志
+        self.tool_used = False  # 工具使用标志
+
     def start_level(self, map_file=None):
         """开始关卡"""
         self.attempts += 1
         self.is_completed = False
         self.guards = []  # 重置守卫列表
+        self.tool_used = False  # 重置工具使用标志
 
         try:
             self.game_map = Map(map_file, difficulty=self.difficulty)
@@ -122,10 +142,12 @@ class Level:
 
 
         self.rotation_angle = 0
+        self.reset_count = 0
         return True
 
     def reset_level(self):
         """重置关卡"""
+        self.reset_count += 1  # 增加重置次数
         if self.game_map and self.ball:
             start_pos = self.game_map.get_start_position()
             if start_pos:
@@ -225,6 +247,20 @@ class Level:
                     self.reset_level()
                     break
 
+    def use_tool(self):
+        """使用工具"""
+        self.tool_used = True
+
+        if self.difficulty == 'easy':
+            # 简单模式：随机移除一个陷阱
+            if self.game_map.traps:
+                trap_to_remove = random.choice(self.game_map.traps)
+                self.game_map.traps.remove(trap_to_remove)
+        elif self.difficulty == 'hard':
+            # 困难模式：使所有荆棘显现
+            for thorn in self.game_map.thorns:
+                thorn.is_visible = True
+
 
     def draw(self, screen):
         """绘制关卡"""
@@ -295,6 +331,63 @@ class Level:
         mode_text = font.render(f"Mode: {self.mode}", True, (0, 0, 0))
         screen.blit(mode_text, (self.mode_button_rect.centerx - mode_text.get_width() // 2,
                                 self.mode_button_rect.centery - mode_text.get_height() // 2))
+
+        reset_color = (220, 220, 220)  # 默认颜色
+        if self.reset_button_rect.collidepoint(mouse_pos):
+            reset_color = (180, 180, 255)  # 悬停颜色
+        pygame.draw.rect(screen, reset_color, self.reset_button_rect)
+        reset_text = font.render(f"Reset: {self.reset_count}", True, (0, 0, 0))
+        screen.blit(reset_text, (self.reset_button_rect.centerx - reset_text.get_width() // 2,
+                                 self.reset_button_rect.centery - reset_text.get_height() // 2))
+
+        # Tool按钮
+        # 根据重置次数决定按钮状态
+        if self.reset_count >= 10 and not self.tool_used:
+            tool_color = (220, 220, 220)  # 可用状态
+            if self.tool_button_rect.collidepoint(mouse_pos):
+                tool_color = (180, 180, 255)  # 悬停颜色
+        else:
+            tool_color = (150, 150, 150)  # 不可用状态（灰色）
+        pygame.draw.rect(screen, tool_color, self.tool_button_rect)
+        tool_text = font.render("Tool", True, (0, 0, 0))
+        screen.blit(tool_text, (self.tool_button_rect.centerx - tool_text.get_width() // 2,
+                                self.tool_button_rect.centery - tool_text.get_height() // 2))
+
+        # Help按钮
+        help_color = (220, 220, 220)  # 默认颜色
+        if self.help_button_rect.collidepoint(mouse_pos):
+            help_color = (180, 180, 255)  # 悬停颜色
+        pygame.draw.rect(screen, help_color, self.help_button_rect)
+        help_text = font.render("Help", True, (0, 0, 0))
+        screen.blit(help_text, (self.help_button_rect.centerx - help_text.get_width() // 2,
+                                self.help_button_rect.centery - help_text.get_height() // 2))
+
+        # 显示帮助信息
+        if self.show_help:
+            help_box = pygame.Rect(
+                self.tool_button_rect.left,
+                self.tool_button_rect.top,
+                300,
+                200
+            )
+            pygame.draw.rect(screen, (255, 255, 230), help_box)
+            pygame.draw.rect(screen, (100, 100, 100), help_box, 2)  # 边框
+
+            help_title = font.render("Tool Usage", True, (0, 0, 0))
+            screen.blit(help_title, (help_box.left + 20, help_box.top + 15))
+
+            # 帮助说明文本
+            help_font = pygame.font.SysFont(None, 20)
+            help_desc1 = help_font.render("Easy Mode: Remove one random trap", True, (0, 0, 0))
+            help_desc2 = help_font.render("Hard Mode: Reveal all thorns", True, (0, 0, 0))
+
+            help_condition = help_font.render("Available after 10 resets", True, (0, 0, 0))
+
+            screen.blit(help_desc1, (help_box.left + 20, help_box.top + 60))
+            screen.blit(help_desc2, (help_box.left + 20, help_box.top + 100))
+            screen.blit(help_condition, (help_box.left + 20, help_box.top + 140))
+            help_once = help_font.render("Can be used once per level", True, (0, 0, 0))
+            screen.blit(help_once, (help_box.left + 20, help_box.top + 180))
 
         if self.show_level_list:
             list_start_y = self.level_button_rect.bottom + 50
@@ -390,3 +483,15 @@ class Level:
                 # 切换模式
                 new_mode = 'non-gravity' if self.mode == 'gravity' else 'gravity'
                 self.switch_mode(new_mode)
+
+            # 处理右侧按钮点击
+            if self.reset_button_rect.collidepoint(mouse_pos):
+                self.reset_level()
+
+            if (self.tool_button_rect.collidepoint(mouse_pos) and
+                    self.reset_count >= 10 and
+                    not self.tool_used):
+                self.use_tool()
+
+            if self.help_button_rect.collidepoint(mouse_pos):
+                self.show_help = not self.show_help

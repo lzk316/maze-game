@@ -4,7 +4,7 @@ from src.game import Game
 def main():
     game = Game()
 
-    game.start_level(4, mode="non-gravity", difficulty="hard")
+    game.start_level(1, mode="non-gravity", difficulty="hard")
 
     game.run()
 

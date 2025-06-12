@@ -143,6 +143,12 @@ class PhysicsWorld:
         }
         return body
 
+    def remove_body(self, body):
+        """从物理世界中移除指定的物理实体"""
+        if body and id(body) in self.bodies:
+            self.world.DestroyBody(body)
+            del self.bodies[id(body)]
+
     def set_rotation_center(self, center):
         """设置旋转中心点"""
         self.rotation_center = center
