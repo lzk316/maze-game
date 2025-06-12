@@ -468,30 +468,31 @@ class Level:
                         self.start_level(map_file)
                         self.show_level_list = False  # 关闭关卡列表显示
                         break  # 找到匹配后退出循环
+            else:             self.is_selecting_level = False
 
-            if self.difficulty_button_rect.collidepoint(mouse_pos):
-                # 切换难度
-                if self.difficulty == "easy":
-                    self.difficulty = "hard"
-                else:
-                    self.difficulty = "easy"
-                # 重新加载关卡以应用新的难度设置
-                map_file = f"maze{self.level_number}.png"
-                self.start_level(map_file)
+            if not self.is_selecting_level:
+                if self.difficulty_button_rect.collidepoint(mouse_pos):
+                    # 切换难度
+                    if self.difficulty == "easy":
+                        self.difficulty = "hard"
+                    else:
+                        self.difficulty = "easy"
+                    # 重新加载关卡以应用新的难度设置
+                    map_file = f"maze{self.level_number}.png"
+                    self.start_level(map_file)
 
-            if self.mode_button_rect.collidepoint(mouse_pos):
-                # 切换模式
-                new_mode = 'non-gravity' if self.mode == 'gravity' else 'gravity'
-                self.switch_mode(new_mode)
+                if self.mode_button_rect.collidepoint(mouse_pos):
+                    # 切换模式
+                    new_mode = 'non-gravity' if self.mode == 'gravity' else 'gravity'
+                    self.switch_mode(new_mode)
 
-            # 处理右侧按钮点击
-            if self.reset_button_rect.collidepoint(mouse_pos):
-                self.reset_level()
+                if self.reset_button_rect.collidepoint(mouse_pos):
+                    self.reset_level()
 
-            if (self.tool_button_rect.collidepoint(mouse_pos) and
-                    self.reset_count >= 10 and
-                    not self.tool_used):
-                self.use_tool()
+                if (self.tool_button_rect.collidepoint(mouse_pos) and
+                        self.reset_count >= 10 and
+                        not self.tool_used):
+                    self.use_tool()
 
-            if self.help_button_rect.collidepoint(mouse_pos):
-                self.show_help = not self.show_help
+                if self.help_button_rect.collidepoint(mouse_pos):
+                    self.show_help = not self.show_help
