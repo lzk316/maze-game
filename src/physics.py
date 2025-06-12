@@ -20,6 +20,7 @@ class PhysicsWorld:
 
         self.world.gravity = gravity
 
+    # this method is based upon AI output.
     def create_ball(self, position, radius, density=1.0, friction=0.1, restitution=0.1):
 
         position_m = (position[0] / self.PPM, position[1] / self.PPM)
@@ -50,6 +51,7 @@ class PhysicsWorld:
         }
         return body
 
+    # this method is based upon AI output.
     def create_static_box(self, position, size):
 
         position_m = (position[0] / self.PPM, position[1] / self.PPM)
@@ -79,6 +81,7 @@ class PhysicsWorld:
         }
         return body
 
+    # this method is based upon AI output.
     def create_static_circle(self, position, radius):
 
         position_m = (position[0] / self.PPM, position[1] / self.PPM)
@@ -109,6 +112,7 @@ class PhysicsWorld:
         }
         return body
 
+    # this method is based upon AI output.
     def create_guard(self, position, radius):
 
         position_m = (position[0] / self.PPM, position[1] / self.PPM)

@@ -135,6 +135,7 @@ class Guard:
                 direction = direction / distance
                 self.position = (self.position + direction * min(float(distance), self.speed)).astype(np.float64)
 
+    # this method is based upon AI output.
     def _find_nearest_patrol_point(self):
 
         min_distance = float('inf')
@@ -160,6 +161,7 @@ class Guard:
         y = grid[1] * self.grid_size + self.grid_size / 2 -50
         return np.array([x, y])
 
+    #this method is based upon AI output.
     def _find_path(self, game_map, target):
 
         grid = [[0 for _ in range(self.grid_height)] for _ in range(self.grid_width)]
@@ -225,6 +227,7 @@ class Guard:
 
         self.path = [target]
 
+    # this method is based upon AI output.
     def _heuristic(self, a, b):
 
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
